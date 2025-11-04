@@ -13,7 +13,6 @@ class STATE(Enum):
     WAIT_FOR_AUDIO = "WAIT_FOR_AUDIO"
     WAIT_FOR_START_DOWNLOADING = "WAIT_FOR_START_DOWNLOADING"
     WAIT_FOR_DOWNLOAD = "WAIT_FOR_DOWNLOAD"
-    # WAIT_FOR_SEND = "WAIT_FOR_SEND"
 
 
 class Handler(ABC):
@@ -21,4 +20,4 @@ class Handler(ABC):
     def can_handle(self, update: dict, state: STATE) -> bool: ...
 
     @abstractmethod
-    def handle(self, update: dict, state: STATE) -> bool: ...
+    def handle(self, update: dict, state: STATE) -> STATUS: ...
