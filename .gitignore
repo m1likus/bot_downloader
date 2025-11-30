@@ -1,4 +1,8 @@
-/__pycache_
+__pycache__
 .env
+.venv/
 *.txt
 !requirements.txt
+videos
+*.sqlite
+videos

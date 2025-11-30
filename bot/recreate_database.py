@@ -1,4 +1,11 @@
-import bot.recreate_database
+import bot.database_client
+import asyncio
 
-bot.create_database.delete_database()
-bot.create_database.create_database()
+
+async def main():
+    await bot.database_client.delete_database()
+    await bot.database_client.create_database()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -1,8 +1,9 @@
-import urllib.request
 import json
 import os
 from enum import Enum
 from dotenv import load_dotenv
+import aiohttp
+import aiofiles
 
 load_dotenv()
 
@@ -11,56 +12,85 @@ class METHODS(Enum):
     getMe = "getMe"
     getUpdates = "getUpdates"
     sendMessage = "sendMessage"
-    sendDocument = "sendDocument"
     deleteMessage = "deleteMessage"
     editMessageText = "editMessageText"
+    answerCallbackQuery = "answerCallbackQuery"
 
 
-def make_request(method: METHODS, **args) -> dict:
+async def make_request(method: METHODS, **args) -> dict:
     json_data = json.dumps(args).encode("utf-8")
+    url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/{method.value}"
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url,
+            data=json_data,
+            headers={
+                "Content-Type": "application/json",
+            },
+        ) as response:
+            response_body = await response.text()
+            response_json = json.loads(response_body)
+            assert response_json["ok"]
+            return response_json["result"]
 
-    request = urllib.request.Request(
-        method="POST",
-        url=f"{os.getenv('TELEGRAM_BASE_URI')}/{method}",
-        data=json_data,
-        headers={
-            "Content-Type": "application/json",
-        },
+
+async def get_me() -> dict:
+    return await make_request(METHODS.getMe)
+
+
+async def get_updates(**kwargs) -> dict:
+    # https://core.telegram.org/bots/api#getupdates
+    return await make_request(METHODS.getUpdates, **kwargs)
+
+
+async def send_message(chat_id: int, text: str, **kwargs) -> dict:
+    # https://core.telegram.org/bots/api#sendmessage
+    return await make_request(METHODS.sendMessage, chat_id=chat_id, text=text, **kwargs)
+
+
+async def send_document(chat_id: int, document_path: str, caption: str = "") -> dict:
+    # https://core.telegram.org/bots/api#senddocument
+    url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendDocument"
+    async with aiohttp.ClientSession() as session:
+        async with aiofiles.open(document_path, "rb") as file:
+            file_data = await file.read()
+            form_data = aiohttp.FormData()
+            form_data.add_field(
+                "document", file_data, filename=os.path.basename(document_path)
+            )
+            form_data.add_field("chat_id", str(chat_id))
+            form_data.add_field("caption", caption)
+
+            async with session.post(url, data=form_data) as response:
+                response_json = await response.json()
+                return response_json["ok"]
+
+
+async def delete_message(chat_id: int, message_id: int, **kwargs) -> dict:
+    # https://core.telegram.org/bots/api#deletemessage
+    return await make_request(
+        METHODS.deleteMessage,
+        chat_id=chat_id,
+        message_id=message_id,
+        **kwargs,
     )
 
-    with urllib.request.urlopen(request) as response:
-        response_body = response.read().decode("utf-8")
-        response_json = json.loads(response_body)
-        assert response_json["ok"] == True
-        return response_json["result"]
 
-
-def get_me() -> dict:
-    return make_request(METHODS.getMe)
-
-
-def get_updates(**args) -> dict:
-    # https://core.telegram.org/bots/api#getupdates
-    return make_request(METHODS.getUpdates, **args)
-
-
-def send_message(chat_id: int, text: str, **args) -> dict:
-    # https://core.telegram.org/bots/api#sendmessage
-    return make_request(METHODS.sendMessage, chat_id=chat_id, text=text, **args)
-
-
-def send_document(chat_id: int, video: str, **args) -> dict:
-    # https://core.telegram.org/bots/api#senddocument
-    return make_request(METHODS.sendDocument, chat_id=chat_id, video=video, **args)
-
-
-def delete_message(chat_id: int, message_id: int) -> dict:
-    # https://core.telegram.org/bots/api#deletemessage
-    return make_request(METHODS.deleteMessage, chat_id=chat_id, message_id=message_id)
-
-
-def edit_message_text(chat_id: int, message_id: int, text: str) -> dict:
+async def edit_message_text(chat_id: int, message_id: int, text: str, **kwargs) -> dict:
     # https://core.telegram.org/bots/api#editmessagetext
-    return make_request(
-        METHODS.editMessageText, chat_id=chat_id, message_id=message_id, text=text
+    return await make_request(
+        METHODS.editMessageText,
+        chat_id=chat_id,
+        message_id=message_id,
+        text=text,
+        **kwargs,
+    )
+
+
+async def answer_callback_query(callback_query_id: str, **kwargs) -> dict:
+    # https://core.telegram.org/bots/api#answercallbackquery
+    return await make_request(
+        METHODS.answerCallbackQuery,
+        callback_query_id=callback_query_id,
+        **kwargs,
     )
