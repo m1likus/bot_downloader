@@ -55,16 +55,22 @@ class DownloadWorker:
             await bot.database_client.update_user_state(
                 telegram_id, STATE.WAIT_FOR_DOWNLOAD
             )
-            success = await self._download_and_send_file(
+            success, error_message = await self._download_and_send_file(
                 chat_id, telegram_id, url, ydl_format
             )
             await bot.database_client.clear_user_video_and_set_state(telegram_id)
 
             if not success:
-                await bot.telegram_api_client.send_message(
-                    chat_id=chat_id,
-                    text="Ошибка отправки. Попробуйте начать заново.",
-                )
+                if error_message is not None:
+                    await bot.telegram_api_client.send_message(
+                        chat_id=chat_id,
+                        text=error_message,
+                    )
+                else:
+                    await bot.telegram_api_client.send_message(
+                        chat_id=chat_id,
+                        text="Ошибка отправки. Попробуйте начать заново.",
+                    )
 
         except Exception:
             await bot.database_client.clear_user_video_and_set_state(telegram_id)
@@ -98,6 +104,20 @@ class DownloadWorker:
                 print(f"Файл не найден: {file_path}")
                 return False
 
+            max_size = 50 * 1024 * 1024
+            filesize = os.path.getsize(file_path)
+            if filesize > max_size:
+                size_mb = filesize / (1024 * 1024)
+                error_message = (
+                    f"Файл слишком большой: {size_mb:.1f}Mb > 50Mb. \n"
+                    f"Пожалуйста, выберите разрешение ниже."
+                )
+
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+                return False, error_message
             success = await bot.telegram_api_client.send_document(
                 chat_id, file_path, title
             )
@@ -106,7 +126,7 @@ class DownloadWorker:
             except Exception:
                 pass
 
-            return success
+            return success, None
 
         except Exception as e:
             await bot.database_client.clear_user_video_and_set_state(telegram_id)

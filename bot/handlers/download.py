@@ -1,9 +1,7 @@
 import bot.telegram_api_client
 import bot.database_client
-import aio_pika
 import traceback
-import json
-import os
+from bot.download_utils import DownloadUtils
 from bot.handlers.handler import Handler
 from bot.types import STATE, STATUS
 
@@ -39,7 +37,7 @@ class DownloadHandler(Handler):
 
     async def _start_download_process(self, chat_id: int, telegram_id: int, user_data):
         # Начинает процесс скачивания: генерирует формат и отправляет задачку в RabbitMQ
-        ydl_format = self._generate_ydl_format(
+        ydl_format = DownloadUtils._generate_ydl_format(
             user_data["video_res"], user_data["video_type"]
         )
 
@@ -53,8 +51,8 @@ class DownloadHandler(Handler):
         }
 
         try:
-            await self._send_to_rabbitmq(download_task)
-            await self._show_download_started(chat_id, user_data)
+            await DownloadUtils._send_to_rabbitmq(download_task)
+            await DownloadUtils._show_download_started(chat_id, user_data)
 
         except Exception:
             traceback.print_exc()
@@ -63,50 +61,3 @@ class DownloadHandler(Handler):
             await bot.telegram_api_client.send_message(
                 chat_id=chat_id, text=error_message
             )
-
-    def _generate_ydl_format(self, res: str, type: str) -> str:
-        # Генерирует ydl_format из разрешения + типа видео
-        res_number = res.replace("p", "")
-        if type == "video_with_audio":
-            return (
-                f"bestvideo[height<={res_number}]+bestaudio/best[height<={res_number}]"
-            )
-        elif type == "video_no_audio":
-            return f"bestvideo[height<={res_number}]"
-        elif type == "only_audio":
-            return "bestaudio/best"
-
-        return "best"
-
-    async def _send_to_rabbitmq(self, download_task: dict):
-        # Отправляет задачку в очередь RabbitMQ
-        connection = await aio_pika.connect_robust(host=os.getenv("RABBITMQ_HOST"))
-        async with connection:
-            channel = await connection.channel()
-
-            queue = await channel.declare_queue(os.getenv("QUEUE_NAME"), durable=True)
-
-            await channel.default_exchange.publish(
-                aio_pika.Message(
-                    body=json.dumps(download_task).encode(),
-                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                ),
-                routing_key=queue.name,
-            )
-
-    async def _show_download_started(self, chat_id: int, user_data: dict):
-        # Показывает пользователю красивое сообщение
-        type = user_data["video_type"]
-        type_display = {
-            "video_with_audio": "видео со звуком",
-            "video_no_audio": "видео без звука",
-            "only_audio": "только звук (MP3)",
-        }.get(type, type)
-        message_text = (
-            f"Качество: {user_data['video_res']}\n"
-            f"Тип видео: {type_display}\n"
-            f"Ссылка на видео: {user_data['url']}\n"
-            "Вы встали в очередь на загрузку...\n"
-            "Пожалуйста, ожидайте..."
-        )
-        await bot.telegram_api_client.send_message(chat_id=chat_id, text=message_text)

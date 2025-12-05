@@ -17,8 +17,18 @@ __pycache__
 # Directories with videos
 videos
 
+# Tests
+tests
+Makefile
+
+# Documentation
+Makefile
+
 # Docker stuff
 docker-compose.yml
+Dockerfile
+.dockerignore
 
 # Git stuff
 .git/
+.gitignore

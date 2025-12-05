@@ -18,7 +18,7 @@ async def test_process_download_task_success_execution():
     }
 
     update_user_state_called = False
-    clear_user_state_called = False
+    clear_user_video_and_set_state_called = False
     send_document_called = False
     send_message_called = False
 
@@ -33,9 +33,9 @@ async def test_process_download_task_success_execution():
         assert telegram_id == 12345
         state_set = state
 
-    async def clear_user_state_and_video(telegram_id: int) -> None:
-        nonlocal clear_user_state_called, telegram_id_cleared
-        clear_user_state_called = True
+    async def clear_user_video_and_set_state(telegram_id: int) -> None:
+        nonlocal clear_user_video_and_set_state_called, telegram_id_cleared
+        clear_user_video_and_set_state_called = True
         telegram_id_cleared = telegram_id
 
     async def send_document(chat_id: int, file_path: str, title: str) -> bool:
@@ -52,7 +52,7 @@ async def test_process_download_task_success_execution():
     bot.database_client = Mock(
         {
             "update_user_state": update_user_state,
-            "clear_user_state_and_video": clear_user_state_and_video,
+            "clear_user_video_and_set_state": clear_user_video_and_set_state,
         }
     )
     bot.telegram_api_client = Mock(
@@ -77,6 +77,23 @@ async def test_process_download_task_success_execution():
 
     yt_dlp.YoutubeDL = MockYoutubeDL
 
+    def exists(path):
+        return True
+
+    def get_size(path):
+        return 25 * 1024 * 1024
+
+    def makedirs(path, exist_ok=False):
+        pass
+
+    def remove(path):
+        pass
+
+    os.path.exists = exists
+    os.path.getsize = get_size
+    os.makedirs = makedirs
+    os.remove = remove
+
     async def process_download_task(task: dict):
         telegram_id = task["telegram_id"]
         chat_id = task["chat_id"]
@@ -91,7 +108,7 @@ async def test_process_download_task_success_execution():
             chat_id, telegram_id, url, ydl_format
         )
 
-        await bot.database_client.clear_user_state_and_video(telegram_id)
+        await bot.database_client.clear_user_video_and_set_state(telegram_id)
         if not success:
             await bot.telegram_api_client.send_message(
                 chat_id=chat_id,
@@ -107,7 +124,7 @@ async def test_process_download_task_success_execution():
 
     assert update_user_state_called
     assert state_set == STATE.WAIT_FOR_DOWNLOAD
-    assert clear_user_state_called
+    assert clear_user_video_and_set_state_called
     assert telegram_id_cleared == 12345
     assert send_document_called
     assert file_path_sent == "/tmp/test.mp4"

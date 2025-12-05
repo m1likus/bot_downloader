@@ -7,7 +7,11 @@ from bot.types import STATE, STATUS
 
 class MessageStart(Handler):
     def can_handle(self, update: dict, state: STATE) -> bool:
-        return "message" in update and "text" in update["message"] and state is None
+        return (
+            "message" in update
+            and "text" in update["message"]
+            and (update["message"]["text"] == "/start" or state is None)
+        )
 
     async def handle(self, update: dict, state: STATE) -> STATUS:
         telegram_id = update["message"]["from"]["id"]
