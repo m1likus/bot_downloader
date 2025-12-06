@@ -18,7 +18,7 @@ class DownloadWorker:
                 await channel.set_qos(prefetch_count=1)
 
                 queue = await channel.declare_queue(
-                    os.getenv("QUEUE_NAME"), durable=True
+                    os.getenv("RABBITMQ_QUEUE_NAME"), durable=True
                 )
                 print("Worker запущен и слушает очередь...")
 

@@ -1,0 +1,17 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+  ffmpeg 
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+  pip install --no-cache-dir -r requirements.txt
+
+COPY bot/ ./bot/
+COPY run_worker.py ./ 
+
+RUN mkdir -p /app/videos
+
+CMD ["python", "-m", "run_worker"]

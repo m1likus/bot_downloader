@@ -27,7 +27,9 @@ class DownloadUtils:
         async with connection:
             channel = await connection.channel()
 
-            queue = await channel.declare_queue(os.getenv("QUEUE_NAME"), durable=True)
+            queue = await channel.declare_queue(
+                os.getenv("RABBITMQ_QUEUE_NAME"), durable=True
+            )
 
             await channel.default_exchange.publish(
                 aio_pika.Message(
